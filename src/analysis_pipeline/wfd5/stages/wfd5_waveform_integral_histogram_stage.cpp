@@ -14,13 +14,6 @@ using namespace dataProducts;
 
 ClassImp(WFD5WaveformIntegralHistogramStage)
 
-struct IntegralCut {
-    std::string detectorSystem;
-    std::string subdetector;
-    double minCut = -1e9;
-    double maxCut = 1e9;
-};
-
 void WFD5WaveformIntegralHistogramStage::OnInit() {
     inputLabel_ = parameters_.value("input_product", "WaveformIntegralCollection");
     outputLabel_ = parameters_.value("product_name", "WaveformIntegralHistogramCollection");
@@ -170,7 +163,7 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, TList* 
         } else {
             spdlog::debug("[{}] Accepting waveform {}:{} integral={} within cuts [{}, {}]",
                         Name(), wi->detectorSystem, wi->subdetector, wi->integral, minCut, maxCut);
-}
+        }
 
 
         TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(key.c_str()));

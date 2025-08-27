@@ -30,22 +30,29 @@ private:
     std::string titlePrefix_;
     int bins_ = 100;
 
-    // fixed/relative
     bool useRelativeRange_ = false;
     double relativeMin_ = 0.0;
     double relativeMax_ = 0.0;
     double min_ = 0.0;
     double max_ = 10000.0;
 
-    // dynamic mode
     bool useDynamic_ = false;
     int dynamicSampleSize_ = 100;
     double dynamicMeanOffset_ = 0.0;
     double dynamicSigmaMultiplier_ = 3.0;
 
+    struct IntegralCut {
+        std::string detectorSystem;
+        std::string subdetector;
+        double minCut = -1e9;
+        double maxCut = 1e9;
+    };
+    std::vector<IntegralCut> integralCuts_;
+
     void FillHistograms(TList* histList, TList* presampleList, const TList* inputList);
 
     ClassDefOverride(WFD5WaveformIntegralHistogramStage, 2);
 };
+
 
 #endif // WFD5_PIPELINE_PLUGIN_STAGES_WFD5_WAVEFORM_INTEGRAL_HISTOGRAM_STAGE_H
