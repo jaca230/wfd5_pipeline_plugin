@@ -5,6 +5,7 @@
 #include <TObject.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <vector>
 
 #include "data_products/wfd5/WaveformIntegral.hh"
 #include "analysis_pipeline/wfd5/data_products/wfd5_waveform_integral_presamples.h"
@@ -12,6 +13,13 @@
 using namespace dataProducts;
 
 ClassImp(WFD5WaveformIntegralHistogramStage)
+
+struct IntegralCut {
+    std::string detectorSystem;
+    std::string subdetector;
+    double minCut = -1e9;
+    double maxCut = 1e9;
+};
 
 void WFD5WaveformIntegralHistogramStage::OnInit() {
     inputLabel_ = parameters_.value("input_product", "WaveformIntegralCollection");
@@ -29,7 +37,6 @@ void WFD5WaveformIntegralHistogramStage::OnInit() {
         spdlog::debug("[{}] Using dynamic range mode: samples={} offset={} sigmaMult={}",
                       Name(), dynamicSampleSize_, dynamicMeanOffset_, dynamicSigmaMultiplier_);
     } else {
-        // legacy mode
         bool hasRelMin = parameters_.contains("relative_min");
         bool hasRelMax = parameters_.contains("relative_max");
         useRelativeRange_ = hasRelMin && hasRelMax;
@@ -42,6 +49,19 @@ void WFD5WaveformIntegralHistogramStage::OnInit() {
             min_ = parameters_.value("min", 0.0);
             max_ = parameters_.value("max", 10000.0);
             spdlog::debug("[{}] Using fixed range: min={} max={}", Name(), min_, max_);
+        }
+    }
+
+    // parse configurable integral cuts
+    if (parameters_.contains("integral_cuts")) {
+        auto cutsJson = parameters_.at("integral_cuts");
+        for (const auto& item : cutsJson) {
+            IntegralCut c;
+            c.detectorSystem = item.value("detectorSystem", "");
+            c.subdetector = item.value("subdetector", "");
+            c.minCut = item.value("min", -1e9);
+            c.maxCut = item.value("max", 1e9);
+            integralCuts_.push_back(c);
         }
     }
 
@@ -117,12 +137,25 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, TList* 
                         + "_det_" + wi->detectorSystem
                         + "_subdet_" + wi->subdetector;
 
-        // try to find histogram
+        // determine min/max cut for this detector/subdetector
+        double minCut = -1e9;
+        double maxCut = 1e9;
+        for (const auto& c : integralCuts_) {
+            if (wi->detectorSystem == c.detectorSystem &&
+                (c.subdetector.empty() || wi->subdetector == c.subdetector)) {
+                minCut = c.minCut;
+                maxCut = c.maxCut;
+                break;
+            }
+        }
+
+        // skip waveform if outside min/max cut
+        if (wi->integral < minCut || wi->integral > maxCut) continue;
+
         TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(key.c_str()));
 
         if (!hist) {
             if (useDynamic_) {
-                // find/create presample
                 auto* pres = dynamic_cast<WFD5WaveformIntegralPresamples*>(presampleList->FindObject(key.c_str()));
                 if (!pres) {
                     pres = new WFD5WaveformIntegralPresamples(key.c_str(), dynamicSampleSize_);
@@ -130,12 +163,8 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, TList* 
                 }
                 pres->AddSample(wi->integral);
 
-                if (!pres->IsFull()) {
-                    // not ready yet
-                    continue;
-                }
+                if (!pres->IsFull()) continue;
 
-                // compute dynamic range
                 double mean = pres->Mean() + dynamicMeanOffset_;
                 double sigma = pres->Sigma();
                 double histMin = mean - dynamicSigmaMultiplier_ * sigma;
@@ -152,7 +181,6 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, TList* 
                 hist->SetDirectory(nullptr);
                 histList->Add(hist);
             } else {
-                // legacy fixed/relative
                 double histMin, histMax;
                 if (useRelativeRange_) {
                     histMin = wi->integral + relativeMin_;
