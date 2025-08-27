@@ -3,16 +3,14 @@
 
 #include "analysis_pipeline/core/stages/base_stage.h"
 #include <string>
+#include <map>
 
-/**
- * @class WFD5WaveformIntegralHistogramStage
- * @brief Pipeline stage reading a TList of WaveformIntegral objects
- *        and accumulating one TH1D histogram per {crate, amc, channel} triple.
- *
- * Two modes:
- *  - Fixed/relative range (legacy).
- *  - Dynamic range: buffer N presamples, then set range = mean + offset ± sigma*multiplier.
- */
+struct ChannelHistInfo {
+    int bins = 100;
+    double xMin = 0.0;
+    double xMax = 10000.0;
+};
+
 class WFD5WaveformIntegralHistogramStage : public BaseStage {
 public:
     WFD5WaveformIntegralHistogramStage() = default;
@@ -23,37 +21,18 @@ public:
 
     std::string Name() const override { return "WFD5WaveformIntegralHistogramStage"; }
 
-    struct IntegralCut {
-        std::string detectorSystem;
-        std::string subdetector;
-        double minCut = -1e9;
-        double maxCut = 1e9;
-    };
-
 private:
     std::string inputLabel_;
     std::string outputLabel_;
     std::string presampleLabel_;
     std::string titlePrefix_;
-    int bins_ = 100;
 
-    bool useRelativeRange_ = false;
-    double relativeMin_ = 0.0;
-    double relativeMax_ = 0.0;
-    double min_ = 0.0;
-    double max_ = 10000.0;
+    // channel map key: "detector_subdet_crate_amc_ch"
+    std::map<std::string, ChannelHistInfo> channelMap_;
 
-    bool useDynamic_ = false;
-    int dynamicSampleSize_ = 100;
-    double dynamicMeanOffset_ = 0.0;
-    double dynamicSigmaMultiplier_ = 3.0;
+    void FillHistograms(TList* histList, const TList* inputList);
 
-    std::vector<IntegralCut> integralCuts_;
-
-    void FillHistograms(TList* histList, TList* presampleList, const TList* inputList);
-
-    ClassDefOverride(WFD5WaveformIntegralHistogramStage, 2);
+    ClassDefOverride(WFD5WaveformIntegralHistogramStage, 3);
 };
 
-
-#endif // WFD5_PIPELINE_PLUGIN_STAGES_WFD5_WAVEFORM_INTEGRAL_HISTOGRAM_STAGE_H
+#endif
