@@ -140,17 +140,38 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, TList* 
         // determine min/max cut for this detector/subdetector
         double minCut = -1e9;
         double maxCut = 1e9;
+        bool foundCut = false;
+
         for (const auto& c : integralCuts_) {
-            if (wi->detectorSystem == c.detectorSystem &&
-                (c.subdetector.empty() || wi->subdetector == c.subdetector)) {
-                minCut = c.minCut;
-                maxCut = c.maxCut;
-                break;
+            if (wi->detectorSystem == c.detectorSystem) {
+                spdlog::debug("[{}] Detector system match: {} == {}", Name(), wi->detectorSystem, c.detectorSystem);
+                if (c.subdetector.empty() || wi->subdetector == c.subdetector) {
+                    spdlog::debug("[{}] Subdetector match: {} == {}", Name(), wi->subdetector, c.subdetector);
+                    minCut = c.minCut;
+                    maxCut = c.maxCut;
+                    foundCut = true;
+                    break;
+                } else {
+                    spdlog::debug("[{}] Subdetector mismatch: {} != {}", Name(), wi->subdetector, c.subdetector);
+                }
             }
         }
 
+        if (!foundCut) {
+            spdlog::debug("[{}] No cut found for waveform {}:{}; using default min/max [{} , {}]",
+                        Name(), wi->detectorSystem, wi->subdetector, minCut, maxCut);
+        }
+
         // skip waveform if outside min/max cut
-        if (wi->integral < minCut || wi->integral > maxCut) continue;
+        if (wi->integral < minCut || wi->integral > maxCut) {
+            spdlog::debug("[{}] Skipping waveform {}:{} integral={} outside cuts [{}, {}]",
+                        Name(), wi->detectorSystem, wi->subdetector, wi->integral, minCut, maxCut);
+            continue;
+        } else {
+            spdlog::debug("[{}] Accepting waveform {}:{} integral={} within cuts [{}, {}]",
+                        Name(), wi->detectorSystem, wi->subdetector, wi->integral, minCut, maxCut);
+}
+
 
         TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(key.c_str()));
 
