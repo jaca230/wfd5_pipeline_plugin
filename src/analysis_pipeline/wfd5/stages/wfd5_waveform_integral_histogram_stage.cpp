@@ -101,10 +101,11 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, const T
         if (!wi) continue;
 
         // Construct histogram name (unique per crate/amc/channel)
-        std::string histName = wi->detectorSystem + "_" + wi->subdetector + "_"
-                             + std::to_string(wi->crateNum) + "_"
-                             + std::to_string(wi->amcNum) + "_"
-                             + std::to_string(wi->channelTag);
+        std::string histName = "crate_" + std::to_string(wi->crateNum)
+                        + "_amc_" + std::to_string(wi->amcNum)
+                        + "_ch_" + std::to_string(wi->channelTag)
+                        + "_det_" + wi->detectorSystem
+                        + "_subdet_" + wi->subdetector;
 
         // Find existing histogram
         TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(histName.c_str()));
@@ -120,11 +121,16 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, const T
             if (it != channelMap_.end()) {
                 info = it->second;
             } else {
-                spdlog::debug("[{}] No channel map info for {}_{}; using default histogram params",
+                spdlog::debug("[{}] No channel map info for {} {}; using default histogram params",
                               Name(), wi->detectorSystem, wi->subdetector);
             }
 
-            std::string histTitle = titlePrefix_ + " - " + histName;
+            std::string histTitle = titlePrefix_ + " - Crate " + std::to_string(wi->crateNum)
+                        + ", AMC " + std::to_string(wi->amcNum)
+                        + ", Ch " + std::to_string(wi->channelTag)
+                        + ", Det " + wi->detectorSystem
+                        + ", Subdet " + wi->subdetector;
+
             hist = new TH1D(histName.c_str(), histTitle.c_str(), info.bins, info.xMin, info.xMax);
             hist->SetDirectory(nullptr);
             histList->Add(hist);
