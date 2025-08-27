@@ -5,6 +5,8 @@
 #include <TObject.h>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <fstream>
+#include <nlohmann/json.hpp>
 
 #include "data_products/wfd5/WaveformIntegral.hh"
 
