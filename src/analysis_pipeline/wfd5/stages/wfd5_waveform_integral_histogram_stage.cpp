@@ -11,6 +11,7 @@
 #include "data_products/wfd5/WaveformIntegral.hh"
 
 using namespace dataProducts;
+using json = nlohmann::json;
 
 ClassImp(WFD5WaveformIntegralHistogramStage)
 
