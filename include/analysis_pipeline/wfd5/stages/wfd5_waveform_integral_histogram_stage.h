@@ -23,6 +23,13 @@ public:
 
     std::string Name() const override { return "WFD5WaveformIntegralHistogramStage"; }
 
+    struct IntegralCut {
+        std::string detectorSystem;
+        std::string subdetector;
+        double minCut = -1e9;
+        double maxCut = 1e9;
+    };
+
 private:
     std::string inputLabel_;
     std::string outputLabel_;
@@ -41,12 +48,6 @@ private:
     double dynamicMeanOffset_ = 0.0;
     double dynamicSigmaMultiplier_ = 3.0;
 
-    struct IntegralCut {
-        std::string detectorSystem;
-        std::string subdetector;
-        double minCut = -1e9;
-        double maxCut = 1e9;
-    };
     std::vector<IntegralCut> integralCuts_;
 
     void FillHistograms(TList* histList, TList* presampleList, const TList* inputList);
