@@ -15,6 +15,10 @@ using json = nlohmann::json;
 
 ClassImp(WFD5WaveformIntegralHistogramStage)
 
+#include <fstream>
+#include <nlohmann/json.hpp>
+using json = nlohmann::json;
+
 void WFD5WaveformIntegralHistogramStage::OnInit() {
     inputLabel_ = parameters_.value("input_product", "WaveformIntegralCollection");
     outputLabel_ = parameters_.value("product_name", "WaveformIntegralHistogramCollection");
@@ -30,18 +34,17 @@ void WFD5WaveformIntegralHistogramStage::OnInit() {
             } else {
                 json mapJson;
                 file >> mapJson;
-                for (const auto& item : mapJson) {
-                    std::string key = item.value("detectorSystem", "") + "_"
-                                    + item.value("subdetector", "") + "_"
-                                    + std::to_string(int(item.value("crateNum", 0))) + "_"
-                                    + std::to_string(int(item.value("amcSlotNum", 0))) + "_"
-                                    + std::to_string(int(item.value("channelNum", 0)));
 
+                for (const auto& item : mapJson) {
                     ChannelHistInfo info;
+                    info.detectorSystem = item.value("detectorSystem", "");
+                    info.subdetector = item.value("subdetector", "");
                     info.bins = item.value("bins", 100);
                     info.xMin = item.value("xMin", 0.0);
                     info.xMax = item.value("xMax", 10000.0);
 
+                    // store in map by detector_subdetector as key
+                    std::string key = info.detectorSystem + "_" + info.subdetector;
                     channelMap_[key] = info;
                 }
                 spdlog::debug("[{}] Loaded {} entries from '{}'", Name(), channelMap_.size(), filename);
@@ -52,6 +55,7 @@ void WFD5WaveformIntegralHistogramStage::OnInit() {
     spdlog::debug("[{}] Initialized with input '{}', output '{}', channelMap size={}",
                   Name(), inputLabel_, outputLabel_, channelMap_.size());
 }
+
 
 void WFD5WaveformIntegralHistogramStage::Process() {
     if (!getDataProductManager()->hasProduct(inputLabel_)) {
@@ -96,24 +100,32 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, const T
         auto* wi = dynamic_cast<const WaveformIntegral*>(obj);
         if (!wi) continue;
 
-        std::string key = wi->detectorSystem + "_"
-                        + wi->subdetector + "_"
-                        + std::to_string(wi->crateNum) + "_"
-                        + std::to_string(wi->amcNum) + "_"
-                        + std::to_string(wi->channelTag);
+        // Construct histogram name (unique per crate/amc/channel)
+        std::string histName = wi->detectorSystem + "_" + wi->subdetector + "_"
+                             + std::to_string(wi->crateNum) + "_"
+                             + std::to_string(wi->amcNum) + "_"
+                             + std::to_string(wi->channelTag);
 
-        auto it = channelMap_.find(key);
-        if (it == channelMap_.end()) {
-            spdlog::debug("[{}] No histogram info for waveform key '{}'; skipping", Name(), key);
-            continue;
-        }
-
-        const auto& info = it->second;
-
-        TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(key.c_str()));
+        // Find existing histogram
+        TH1D* hist = dynamic_cast<TH1D*>(histList->FindObject(histName.c_str()));
         if (!hist) {
-            std::string histTitle = titlePrefix_ + " - " + key;
-            hist = new TH1D(key.c_str(), histTitle.c_str(), info.bins, info.xMin, info.xMax);
+            // Look for channel map info by detector/subdetector
+            ChannelHistInfo info;
+            auto it = std::find_if(channelMap_.begin(), channelMap_.end(),
+                [&](const auto& kv) {
+                    const auto& cinfo = kv.second;
+                    return cinfo.detectorSystem == wi->detectorSystem &&
+                           cinfo.subdetector == wi->subdetector;
+                });
+            if (it != channelMap_.end()) {
+                info = it->second;
+            } else {
+                spdlog::debug("[{}] No channel map info for {}_{}; using default histogram params",
+                              Name(), wi->detectorSystem, wi->subdetector);
+            }
+
+            std::string histTitle = titlePrefix_ + " - " + histName;
+            hist = new TH1D(histName.c_str(), histTitle.c_str(), info.bins, info.xMin, info.xMax);
             hist->SetDirectory(nullptr);
             histList->Add(hist);
         }
@@ -121,3 +133,4 @@ void WFD5WaveformIntegralHistogramStage::FillHistograms(TList* histList, const T
         hist->Fill(wi->integral);
     }
 }
+

@@ -5,12 +5,6 @@
 #include <string>
 #include <map>
 
-struct ChannelHistInfo {
-    int bins = 100;
-    double xMin = 0.0;
-    double xMax = 10000.0;
-};
-
 class WFD5WaveformIntegralHistogramStage : public BaseStage {
 public:
     WFD5WaveformIntegralHistogramStage() = default;
@@ -20,6 +14,15 @@ public:
     void Process() override;
 
     std::string Name() const override { return "WFD5WaveformIntegralHistogramStage"; }
+
+    struct ChannelHistInfo {
+        std::string detectorSystem;
+        std::string subdetector;
+        int bins = 100;
+        double xMin = 0.0;
+        double xMax = 10000.0;
+    };
+
 
 private:
     std::string inputLabel_;
